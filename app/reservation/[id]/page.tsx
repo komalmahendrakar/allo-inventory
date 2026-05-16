@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useEffect, useState, use } from "react";
+import { useRouter } from "next/navigation";
 import { confirmReservation, releaseReservation } from "@/lib/api";
 
 type Reservation = {
@@ -28,30 +28,33 @@ function useCountdown(expiresAt: string) {
   return { minutes, seconds, isExpired: remaining === 0 };
 }
 
-export default function ReservationPage() {
-  const params = useParams();
-  const id = params.id as string;
+export default function ReservationPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const router = useRouter();
   const [reservation, setReservation] = useState<Reservation | null>(null);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const resolvedParams = use(params);
 
   const { minutes, seconds, isExpired } = useCountdown(
     reservation?.expiresAt ?? new Date(Date.now() + 600000).toISOString()
   );
 
   useEffect(() => {
-    fetch(`/api/reservations/${id}`)
+    fetch(`/api/reservations/${resolvedParams.id}`)
       .then((r) => r.json())
       .then(setReservation)
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [resolvedParams.id]);
 
   async function handleConfirm() {
     setActing(true); setError(null);
     try {
-      await confirmReservation(params.id);
+      await confirmReservation(resolvedParams.id);
       setReservation((r) => r && { ...r, status: "CONFIRMED" });
     } catch (err: any) {
       if (err.status === 410) {
@@ -66,7 +69,7 @@ export default function ReservationPage() {
   async function handleCancel() {
     setActing(true); setError(null);
     try {
-      await releaseReservation(params.id);
+      await releaseReservation(resolvedParams.id);
       setReservation((r) => r && { ...r, status: "RELEASED" });
     } catch {
       setError("Something went wrong. Please try again.");
