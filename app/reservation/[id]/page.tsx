@@ -3,9 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { confirmReservation, releaseReservation } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Reservation = {
   id: string;
@@ -18,23 +15,17 @@ type Reservation = {
 
 function useCountdown(expiresAt: string) {
   const [remaining, setRemaining] = useState(0);
-
   useEffect(() => {
     function tick() {
-      // Always calculate from server timestamp — never count down from a local variable
-      const diff = Math.max(0, new Date(expiresAt).getTime() - Date.now());
-      setRemaining(diff);
+      setRemaining(Math.max(0, new Date(expiresAt).getTime() - Date.now()));
     }
     tick();
-    const interval = setInterval(tick, 1000);
-    return () => clearInterval(interval);
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
   }, [expiresAt]);
-
   const minutes = Math.floor(remaining / 60000);
   const seconds = Math.floor((remaining % 60000) / 1000);
-  const isExpired = remaining === 0;
-
-  return { minutes, seconds, isExpired };
+  return { minutes, seconds, isExpired: remaining === 0 };
 }
 
 export default function ReservationPage() {
@@ -47,7 +38,7 @@ export default function ReservationPage() {
   const [error, setError] = useState<string | null>(null);
 
   const { minutes, seconds, isExpired } = useCountdown(
-    reservation?.expiresAt ?? new Date().toISOString()
+    reservation?.expiresAt ?? new Date(Date.now() + 600000).toISOString()
   );
 
   useEffect(() => {
@@ -58,156 +49,226 @@ export default function ReservationPage() {
   }, [id]);
 
   async function handleConfirm() {
-    setActing(true);
-    setError(null);
+    setActing(true); setError(null);
     try {
-      await confirmReservation(id);
+      await confirmReservation(params.id);
       setReservation((r) => r && { ...r, status: "CONFIRMED" });
     } catch (err: any) {
       if (err.status === 410) {
-        setError("Your reservation expired before payment could complete.");
+        setError("Your reservation expired before payment completed.");
         setReservation((r) => r && { ...r, status: "RELEASED" });
       } else {
         setError("Something went wrong. Please try again.");
       }
-    } finally {
-      setActing(false);
-    }
+    } finally { setActing(false); }
   }
 
   async function handleCancel() {
-    setActing(true);
-    setError(null);
+    setActing(true); setError(null);
     try {
-      await releaseReservation(id);
+      await releaseReservation(params.id);
       setReservation((r) => r && { ...r, status: "RELEASED" });
-    } catch (err: any) {
+    } catch {
       setError("Something went wrong. Please try again.");
-    } finally {
-      setActing(false);
-    }
+    } finally { setActing(false); }
   }
-
-  if (loading) {
-    return (
-      <main className="max-w-lg mx-auto p-6">
-        <p className="text-muted-foreground">Loading reservation...</p>
-      </main>
-    );
-  }
-
-  if (!reservation) {
-    return (
-      <main className="max-w-lg mx-auto p-6">
-        <p className="text-red-500">Reservation not found.</p>
-        <Button className="mt-4" onClick={() => router.push("/")}>
-          Back to products
-        </Button>
-      </main>
-    );
-  }
-
-  const isPending = reservation.status === "PENDING";
-  const isConfirmed = reservation.status === "CONFIRMED";
 
   return (
-    <main className="max-w-lg mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Checkout</h1>
+    <div style={{ minHeight: "100vh", backgroundColor: "#0f0f0f", fontFamily: "'DM Sans', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(16px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .fade-up { animation: fadeUp 0.4s ease both; }
+        @keyframes pulse-ring {
+          0%   { box-shadow: 0 0 0 0 rgba(232,213,176,0.3); }
+          70%  { box-shadow: 0 0 0 12px rgba(232,213,176,0); }
+          100% { box-shadow: 0 0 0 0 rgba(232,213,176,0); }
+        }
+        .timer-pulse { animation: pulse-ring 2s infinite; }
+        .btn-primary {
+          flex: 1; padding: 14px;
+          background: #e8d5b0; color: #0f0f0f;
+          border: none; border-radius: 10px;
+          font-size: 15px; font-weight: 600;
+          cursor: pointer; font-family: 'DM Sans', sans-serif;
+          transition: background 0.15s, transform 0.1s;
+        }
+        .btn-primary:hover:not(:disabled) { background: #f0e0c0; transform: scale(1.02); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-ghost {
+          flex: 1; padding: 14px;
+          background: transparent; color: #888;
+          border: 1px solid #2a2a2a; border-radius: 10px;
+          font-size: 15px; font-weight: 500;
+          cursor: pointer; font-family: 'DM Sans', sans-serif;
+          transition: border-color 0.15s, color 0.15s;
+        }
+        .btn-ghost:hover:not(:disabled) { border-color: #555; color: #ccc; }
+        .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+      `}</style>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>{reservation.productName}</CardTitle>
-            <Badge
-              variant={
-                isConfirmed
-                  ? "default"
-                  : reservation.status === "RELEASED"
-                  ? "destructive"
-                  : "secondary"
-              }
-            >
-              {reservation.status}
-            </Badge>
+      {/* Navbar */}
+      <nav style={{
+        borderBottom: "1px solid #2a2a2a", padding: "0 32px", height: "60px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        background: "#0f0f0f",
+      }}>
+        <span
+          onClick={() => router.push("/")}
+          style={{ fontFamily: "'DM Serif Display', serif", fontSize: "22px", color: "#e8d5b0", cursor: "pointer" }}
+        >
+          allo
+        </span>
+        <span style={{ fontSize: "12px", color: "#555", fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          Checkout
+        </span>
+      </nav>
+
+      <main style={{ maxWidth: "480px", margin: "0 auto", padding: "48px 24px" }}>
+        {loading && (
+          <div style={{ background: "#1a1a1a", borderRadius: "16px", height: "320px",
+            background: "linear-gradient(90deg,#1a1a1a 25%,#222 50%,#1a1a1a 75%)",
+            backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
+        )}
+
+        {!loading && !reservation && (
+          <div style={{ textAlign: "center", color: "#666", paddingTop: "80px" }}>
+            <p style={{ fontSize: "16px", marginBottom: "24px" }}>Reservation not found.</p>
+            <button className="btn-primary" style={{ maxWidth: "200px" }} onClick={() => router.push("/")}>
+              Back to shop
+            </button>
           </div>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <div className="text-sm text-muted-foreground grid gap-1">
-            <p>Warehouse: {reservation.warehouseName}</p>
-            <p>Quantity: {reservation.quantity}</p>
+        )}
+
+        {!loading && reservation && (
+          <div className="fade-up">
+            {/* Product info card */}
+            <div style={{
+              background: "#1a1a1a", border: "1px solid #2a2a2a",
+              borderRadius: "16px", padding: "28px", marginBottom: "16px",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
+                <div>
+                  <p style={{ fontSize: "12px", color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "6px" }}>
+                    Reserving
+                  </p>
+                  <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "24px", color: "#f5f0e8", lineHeight: 1.2 }}>
+                    {reservation.productName}
+                  </h1>
+                </div>
+                <span style={{
+                  fontSize: "11px", fontWeight: 600, padding: "4px 10px", borderRadius: "20px",
+                  letterSpacing: "0.06em", textTransform: "uppercase",
+                  background: reservation.status === "CONFIRMED" ? "#102a15" : reservation.status === "RELEASED" ? "#2a1515" : "#1a1a10",
+                  color: reservation.status === "CONFIRMED" ? "#4ade80" : reservation.status === "RELEASED" ? "#f87171" : "#fbbf24",
+                }}>
+                  {reservation.status}
+                </span>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                {[
+                  { label: "Warehouse", value: reservation.warehouseName },
+                  { label: "Quantity", value: `${reservation.quantity} unit${reservation.quantity > 1 ? "s" : ""}` },
+                ].map(({ label, value }) => (
+                  <div key={label} style={{ background: "#111", borderRadius: "10px", padding: "12px 14px" }}>
+                    <p style={{ fontSize: "11px", color: "#555", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</p>
+                    <p style={{ fontSize: "14px", color: "#d0ccc4", fontWeight: 500 }}>{value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Timer / status card */}
+            {reservation.status === "PENDING" && (
+              <div style={{
+                background: isExpired ? "#2a1515" : "#141410",
+                border: `1px solid ${isExpired ? "#5a2020" : "#3a3020"}`,
+                borderRadius: "16px", padding: "28px",
+                textAlign: "center", marginBottom: "16px",
+              }}
+                className={!isExpired ? "timer-pulse" : ""}
+              >
+                {isExpired ? (
+                  <>
+                    <p style={{ fontSize: "28px", marginBottom: "6px" }}>⏰</p>
+                    <p style={{ fontSize: "16px", fontWeight: 600, color: "#f87171" }}>Reservation expired</p>
+                    <p style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>This hold has been released.</p>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ fontSize: "12px", color: "#888", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "10px" }}>
+                      Held for you
+                    </p>
+                    <p style={{
+                      fontFamily: "'DM Serif Display', serif",
+                      fontSize: "52px", color: "#e8d5b0", lineHeight: 1,
+                      letterSpacing: "-0.02em", marginBottom: "6px",
+                    }}>
+                      {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+                    </p>
+                    <p style={{ fontSize: "12px", color: "#666" }}>minutes remaining</p>
+                  </>
+                )}
+              </div>
+            )}
+
+            {reservation.status === "CONFIRMED" && (
+              <div style={{
+                background: "#102a15", border: "1px solid #1a4a25",
+                borderRadius: "16px", padding: "28px", textAlign: "center", marginBottom: "16px",
+              }}>
+                <p style={{ fontSize: "28px", marginBottom: "6px" }}>✓</p>
+                <p style={{ fontSize: "16px", fontWeight: 600, color: "#4ade80" }}>Purchase confirmed!</p>
+                <p style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>Your order has been placed successfully.</p>
+              </div>
+            )}
+
+            {reservation.status === "RELEASED" && !error && (
+              <div style={{
+                background: "#2a1515", border: "1px solid #5a2020",
+                borderRadius: "16px", padding: "28px", textAlign: "center", marginBottom: "16px",
+              }}>
+                <p style={{ fontSize: "13px", color: "#f87171" }}>This reservation has been released.</p>
+              </div>
+            )}
+
+            {/* Error message */}
+            {error && (
+              <div style={{
+                background: "#2a1515", border: "1px solid #5a2020",
+                borderRadius: "10px", padding: "14px 18px",
+                color: "#f87171", fontSize: "14px", marginBottom: "16px",
+                display: "flex", gap: "8px", alignItems: "center",
+              }}>
+                <span>⚠</span> {error}
+              </div>
+            )}
+
+            {/* Action buttons */}
+            {reservation.status === "PENDING" && !isExpired && (
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button className="btn-primary" onClick={handleConfirm} disabled={acting}>
+                  {acting ? "Processing…" : "Confirm purchase"}
+                </button>
+                <button className="btn-ghost" onClick={handleCancel} disabled={acting}>
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            {(reservation.status === "RELEASED" || isExpired) && (
+              <button className="btn-primary" onClick={() => router.push("/")} style={{ width: "100%" }}>
+                Back to shop
+              </button>
+            )}
           </div>
-
-          {isPending && (
-            <div
-              className={`p-4 rounded-lg text-center ${
-                isExpired
-                  ? "bg-red-50 border border-red-200"
-                  : "bg-amber-50 border border-amber-200"
-              }`}
-            >
-              {isExpired ? (
-                <p className="text-red-600 font-medium">Reservation expired</p>
-              ) : (
-                <>
-                  <p className="text-amber-700 text-sm mb-1">
-                    Reserved for you
-                  </p>
-                  <p className="text-2xl font-mono font-bold text-amber-800">
-                    {String(minutes).padStart(2, "0")}:
-                    {String(seconds).padStart(2, "0")}
-                  </p>
-                </>
-              )}
-            </div>
-          )}
-
-          {isConfirmed && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-center">
-              <p className="text-green-700 font-medium">
-                Purchase confirmed! Thank you.
-              </p>
-            </div>
-          )}
-
-          {reservation.status === "RELEASED" && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-center">
-              <p className="text-red-600 font-medium">
-                This reservation has been released.
-              </p>
-            </div>
-          )}
-
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
-
-          {isPending && !isExpired && (
-            <div className="flex gap-3">
-              <Button
-                className="flex-1"
-                onClick={handleConfirm}
-                disabled={acting}
-              >
-                {acting ? "Processing..." : "Confirm purchase"}
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={handleCancel}
-                disabled={acting}
-              >
-                Cancel
-              </Button>
-            </div>
-          )}
-
-          {(reservation.status === "RELEASED" || isExpired) && (
-            <Button onClick={() => router.push("/")}>Back to products</Button>
-          )}
-        </CardContent>
-      </Card>
-    </main>
+        )}
+      </main>
+    </div>
   );
 }
