@@ -1,6 +1,6 @@
 # Allo Inventory
 
-Live demo: [add Vercel URL after deployment]
+Live demo:(https://allo-inventory-6qc9.vercel.app/)
 
 ---
 
