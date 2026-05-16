@@ -133,7 +133,7 @@ export default function ReservationPage({
 
       <main style={{ maxWidth: "480px", margin: "0 auto", padding: "48px 24px" }}>
         {loading && (
-          <div style={{ background: "#1a1a1a", borderRadius: "16px", height: "320px",
+          <div style={{ borderRadius: "16px", height: "320px",
             background: "linear-gradient(90deg,#1a1a1a 25%,#222 50%,#1a1a1a 75%)",
             backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
         )}
