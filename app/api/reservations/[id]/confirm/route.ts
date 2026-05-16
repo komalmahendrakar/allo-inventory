@@ -1,15 +1,18 @@
+
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await context.params;
   try {
     const idempotencyKey = req.headers.get("idempotency-key");
 
     if (idempotencyKey) {
-      const existing = await prisma.idempotencyKey.findUnique({
+      const existing = await prisma.idempotencyKey.findUnique({                
         where: { key: idempotencyKey },
       });
       if (existing) {
@@ -18,7 +21,7 @@ export async function POST(
     }
 
     const reservation = await prisma.reservation.findUnique({
-      where: { id: params.id },
+      where: { id: id },
     });
 
     if (!reservation) {
