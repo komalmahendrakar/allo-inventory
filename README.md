@@ -60,8 +60,9 @@ Two layers:
    when a user loads the product page.
 
 2. **Vercel Cron** — `vercel.json` schedules `GET /api/cron/release-expired` 
-   every minute. Catches reservations that are never read — user closes 
-   the tab and never returns. Vercel calls this automatically in production.
+   once daily. Vercel's free tier limits cron to once per day — the lazy 
+   cleanup on `GET /api/products` compensates for this on every page load. 
+   In production I'd upgrade to run every minute.
 
 ---
 
@@ -92,7 +93,7 @@ time I'd use Redis with a native TTL.
 | POST | `/api/reservations` | Create reservation, returns 409 if stock unavailable |
 | POST | `/api/reservations/:id/confirm` | Confirm reservation, returns 410 if expired |
 | POST | `/api/reservations/:id/release` | Release reservation early |
-
+| GET | `/api/cron/release-expired` | Called by Vercel Cron daily to clean up expired reservations |
 
 ---
 
